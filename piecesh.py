@@ -11,7 +11,7 @@ class pieces:
         [1, 1]
     ]
     left_up_l = [
-        [1, 1],
+        [1, 1], 
         [1],
         [1],
     ]
@@ -200,6 +200,8 @@ class pieces:
     all_pieces = list(enumerate(all_pieces_no_keys))
 
     cordinate_dict = {piece[0] : [(i, j) for i in range(len(piece[1])) for j in range(len(piece[1][i])) if piece[1][i][j] == 1] for piece in all_pieces}
+
+    width_height_dict = {piece[0] : (max(map(len, piece[1])), len(piece[1])) for piece in all_pieces}
 
     def print_piece(piece, num=0):
         if type(piece) == int:
