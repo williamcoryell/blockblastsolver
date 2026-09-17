@@ -57,18 +57,74 @@ class game:
             return 1
         return 0
 
+    def run_add_piece(self, piece, x=0, y=0):
+        if not self.run_can_place(piece, x, y):
+            return -1
+        for x_m, y_m in pieces.cordinate_dict[piece[0]]:
+            self.board[x + x_m + 8 * (y + y_m)] = 1
+        return 4
+
+    def run_can_place(self, piece, x, y):
+        for x_m, y_m in pieces.cordinate_dict[piece[0]]:
+            if x_m + x < 0 or y_m + y < 0 or x_m + x >= 8 or y_m + y >= 8 or self.board[x_m + x + 8 * (y_m + y)] == 1:
+                return 0
+        return 1
+    
+    def run_place_block(self, piece, x, y):
+        place_result = self.run_add_piece(piece, x, y)
+        if place_result != -1:
+            board_break = self.break_board()
+            return board_break
+        else:
+            return -1
+    
+    def run_one_game_turn_no_reset(self, move):
+        line_broke = 0
+        if self.current_pieces[move[0]][0] == -1:
+            return -1
+        place_result = self.run_place_block(self.current_pieces[move[0]], move[1], move[2])
+        if place_result == -1:
+            return -2
+        self.current_pieces[move[0]] = (-1, [[0]])
+        if place_result >= 1:
+            line_broke = 1
+            self.combo += 1
+            self.combo_counter = 3
+            if numpy.any(self.board == 1):
+                self.score += 300
+            self.score += 5
+            if self.combo == 1:
+                self.score += 28 * place_result**2
+            elif self.combo == 2:
+                self.score += 82 * place_result**2
+            elif self.combo == 3:
+                self.score += 109 * place_result**2
+            elif self.combo == 4:
+                self.score += 139 * place_result**2
+            else:
+                self.score += 56 * self.combo * place_result**2
+        else:
+            self.score += 5
+            if self.combo_counter == 1:
+                self.combo = 0
+                self.combo_counter -= 1
+            elif self.combo_counter > 0:
+                self.combo_counter -= 1
+        return line_broke
+
     def break_board(self):
-        hor_lst = [i for i in range(8) if all(self.board[i + 8 * j] != 0 for j in range(8))]
-        vert_lst = [j for j in range(8) if all(self.board[i + 8 * j] != 0 for i in range(8))]
-        for i in hor_lst:
-            self.board[i:i+7] = 0
-        for j in vert_lst:
-            for i in range(8):
-                self.board[i + 8 * j] = 0
-        return len(hor_lst) + len(vert_lst)
+        full_rows = [y for y in range(8) if all(self.board[x + 8 * y] != 0 for x in range(8))]
+        full_cols = [x for x in range(8) if all(self.board[x + 8 * y] != 0 for y in range(8))]
+        for y in full_rows:
+            for x in range(8):
+                self.board[x + 8 * y] = 0
+        for x in full_cols:
+            for y in range(8):
+                self.board[x + 8 * y] = 0
+        return len(full_rows) + len(full_cols)
     
     def reset_board(self):
-        self.board = numpy.copy([i for i in range(64)])
+        self.board = numpy.zeros(64, dtype=int)
 
     def random_pieces(self):
         random_pieces = [pieces.all_pieces[randint(0, len(pieces.all_pieces) - 1)] for i in range(3)]
@@ -91,7 +147,6 @@ class game:
         return (self.current_pieces, self.board, self.combo, self.combo_counter, self.score, line_broke)
     
     def one_game_turn_no_reset(self, move):
-        score_mult = 1
         line_broke = 0
         if self.current_pieces[move[0]][0] == -1:
             return -1
@@ -103,23 +158,26 @@ class game:
             line_broke = 1
             self.combo += 1
             self.combo_counter = 3
+            if numpy.any(self.board == 1):
+                self.score += 300
+            self.score += 5
             if self.combo == 1:
-                self.score += 28 * place_result * score_mult
+                self.score += 28 * place_result**2
             elif self.combo == 2:
-                self.score += 82 * place_result * score_mult
+                self.score += 82 * place_result**2
             elif self.combo == 3:
-                self.score += 109 * place_result * score_mult
+                self.score += 109 * place_result**2
             elif self.combo == 4:
-                self.score += 139 * place_result * score_mult
+                self.score += 139 * place_result**2
             else:
-                self.score += 56 * self.combo * place_result * score_mult
-        elif self.combo_counter == 1:
-            self.combo = 0
-            self.combo_counter -= 1
-        elif place_result == 0:
-            self.score += 4
-        elif self.combo_counter > 0:
-            self.combo_counter -= 1
+                self.score += 56 * self.combo * place_result**2
+        else:
+            self.score += 5
+            if self.combo_counter == 1:
+                self.combo = 0
+                self.combo_counter -= 1
+            elif self.combo_counter > 0:
+                self.combo_counter -= 1
         return line_broke
 
     def reset_pieces(self):
