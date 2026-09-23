@@ -1,9 +1,7 @@
-from ai import Heuristic_CNN
 from gamelogic import game
 from piecesh import pieces as piecesh
 import random
 import math
-import time
 import numpy
 import heapq
 import torch
@@ -186,7 +184,7 @@ def play_game(cnn, best_game):
 
 def test_models(start, end, tests):
     for i in range(start, end):
-        cnn = torch.load(f"model{i}.pt")
+        cnn = torch.load(f"models/model{i}.pt", weights_only=False)
         total_score = 0
         best_game = game()
         for j in range(tests):
@@ -196,7 +194,7 @@ def test_models(start, end, tests):
 
 if __name__ == "__main__":
     cur_game = game()
-    cnn = torch.load("models/model249.pt")
+    cnn = torch.load("models/model249.pt", weights_only=False)
     optimizer = optim.Adam(cnn.parameters(), lr = 0.001)
     EPSILON_DECAY = 0.9999
     loss_fn = nn.SmoothL1Loss()
