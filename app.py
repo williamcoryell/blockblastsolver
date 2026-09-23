@@ -40,7 +40,7 @@ print("Which model?")
 model_number = input()
 cnn_model = Heuristic_CNN()
 try:
-    cnn_model = torch.load(f"models/model{model_number}.pt")
+    cnn_model = torch.load(f"models/model{model_number}.pt", weights_only=False)
     cnn_model.eval()
 except Exception:
     print("No trained model found. Using untrained Heuristic_CNN.")
@@ -76,9 +76,10 @@ def extract_custom_piece(grid, dynamic_id):
     trimmed = grid[rmin:rmax+1, cmin:cmax+1].T.tolist()
     piece_tuple = (dynamic_id, trimmed)
     
-    pieces.all_pieces.append(piece_tuple)
     pieces.cordinate_dict[dynamic_id] = [(i, j) for i in range(len(trimmed)) for j in range(len(trimmed[i])) if trimmed[i][j] == 1]
-    pieces.width_height_dict[dynamic_id] = (max(map(len, trimmed)), len(trimmed))
+    # trimmed is column-major (transposed): len(trimmed) is the width (# columns),
+    # max row length is the height (# rows). width_height_dict is (width, height).
+    pieces.width_height_dict[dynamic_id] = (len(trimmed), max(map(len, trimmed)))
     
     return piece_tuple
 

@@ -35,7 +35,7 @@ class game:
 
     def can_place(self, piece, x, y):
         valid = False
-        if x + pieces.width_height_dict[piece[0]][0] > 7 or y + pieces.width_height_dict[piece[0]][1] > 7:
+        if x + pieces.width_height_dict[piece[0]][0] > 8 or y + pieces.width_height_dict[piece[0]][1] > 8:
             return 0
         for x_m, y_m in pieces.cordinate_dict[piece[0]]:
             if x_m + x >= 0 and y_m + y >= 0 and x_m + x < 8 and y_m + y < 8 and self.board[x_m + x + 8 * (y_m + y)] != 1:
@@ -45,7 +45,9 @@ class game:
                     for v in [-1, 0, 1]:
                         if h == v or -h == v:
                             continue
-                        if y_a + v < 8 and y_a + v > 0 and (x_a + h < 0 or x_a + h >= 8 or self.board[x_a + h + 8*(y_a + v)] == 1):
+                        x_n = x_a + h
+                        y_n = y_a + v
+                        if x_n < 0 or x_n >= 8 or y_n < 0 or y_n >= 8 or self.board[x_n + 8 * y_n] == 1:
                             valid = True
                             break
                     else:
