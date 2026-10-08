@@ -213,7 +213,7 @@ if __name__ == "__main__":
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        if epsilon < random.random():
+        if epsilon > random.random():
             for j in range(100):
                 new_game = choose_random_game(cur_game, 3)
                 if new_game != None:
