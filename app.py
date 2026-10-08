@@ -100,8 +100,9 @@ def draw_counter_ui(surface, label, value, x_pos, y_pos):
 def evaluate_best_move():
     global best_board_state, step_boards, main_board, current_combo, current_combo_counter
     
-    flat_board = main_board.flatten()
-    g = game(board=flat_board)
+    flat = main_board.flatten()
+    bitfield = int(sum(int(v) << i for i, v in enumerate(flat)))
+    g = game(board=bitfield)
     
     g.combo = current_combo
     g.combo_counter = current_combo_counter

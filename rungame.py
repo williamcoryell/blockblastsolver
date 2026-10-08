@@ -5,7 +5,7 @@ def run_dfs(new_game, board_tensor, info_tensor, game_list, visited_states, curr
         current_path = []
     pieces = new_game.get_pieces()
     valid_moves = []
-    board_hash = new_game.get_board().tobytes()
+    board_hash = new_game.board
     available_pieces = tuple([p[0] for p in pieces if p[0] != -1])
     state_key = (board_hash, available_pieces, new_game.score)
     if state_key in visited_states:

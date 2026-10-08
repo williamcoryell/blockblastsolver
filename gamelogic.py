@@ -1,13 +1,29 @@
 from random import randint
 from piecesh import pieces
 import numpy
+
+def col_mask(x):
+    mask = 0
+    for y in range(8):
+        mask |= 1 << (x + 8 * y)
+    return mask
+_ROW_MASKS = [0xFF << (8 * y) for y in range(8)]
+_COL_MASKS = [col_mask(x) for x in range(8)]
+
 class game:
-    
+
     def __init__(self, board=-1, score=0, current_pieces=-1, combo=0, combo_counter=0):
-        if type(board) == int:
-            self.board = numpy.array([0 for i in range(64)])
+        if isinstance(board, int):
+            if board == -1:
+                self.board = 0
+            else:
+                self.board = board & (1 << 64) - 1
         else:
-            self.board = numpy.array(board, copy=True)
+            bits = 0
+            for i, val in enumerate(board):
+                if val:
+                    bits |= 1 << i
+            self.board = bits & (1 << 64) - 1
         self.score = score
         if type(current_pieces) == int:
             self.current_pieces = self.random_pieces()
@@ -16,13 +32,16 @@ class game:
         self.combo = combo
         self.combo_counter = combo_counter
 
+    def _cell(self, board, i):
+        return (board >> i) & 1
+
     def get_board(self):
-        return self.board
+        return numpy.array([(self.board >> i) & 1 for i in range(64)], dtype=int)
 
     def print_board(self):
         for i in range(8):
             for j in range(8):
-                print(self.board[i + j * 8], end="  ")
+                print(self._cell(self.board, i + j * 8), end="  ")
             print("\n")
         print("\n")
 
@@ -30,7 +49,7 @@ class game:
         if not self.can_place(piece, x, y):
             return -1
         for x_m, y_m in pieces.cordinate_dict[piece[0]]:
-            self.board[x + x_m + 8 * (y + y_m)] = 1
+            self.board |= 1 << (x + x_m + 8 * (y + y_m))
         return 4
 
     def can_place(self, piece, x, y):
@@ -38,7 +57,7 @@ class game:
         if x + pieces.width_height_dict[piece[0]][0] > 8 or y + pieces.width_height_dict[piece[0]][1] > 8:
             return 0
         for x_m, y_m in pieces.cordinate_dict[piece[0]]:
-            if x_m + x >= 0 and y_m + y >= 0 and x_m + x < 8 and y_m + y < 8 and self.board[x_m + x + 8 * (y_m + y)] != 1:
+            if x_m + x >= 0 and y_m + y >= 0 and x_m + x < 8 and y_m + y < 8 and self._cell(self.board, x_m + x + 8 * (y_m + y)) != 1:
                 x_a = x_m + x
                 y_a = y_m + y
                 for h in [-1, 0, 1]:
@@ -47,7 +66,7 @@ class game:
                             continue
                         x_n = x_a + h
                         y_n = y_a + v
-                        if x_n < 0 or x_n >= 8 or y_n < 0 or y_n >= 8 or self.board[x_n + 8 * y_n] == 1:
+                        if x_n < 0 or x_n >= 8 or y_n < 0 or y_n >= 8 or self._cell(self.board, x_n + 8 * y_n) == 1:
                             valid = True
                             break
                     else:
@@ -63,15 +82,15 @@ class game:
         if not self.run_can_place(piece, x, y):
             return -1
         for x_m, y_m in pieces.cordinate_dict[piece[0]]:
-            self.board[x + x_m + 8 * (y + y_m)] = 1
+            self.board |= 1 << (x + x_m + 8 * (y + y_m))
         return 4
 
     def run_can_place(self, piece, x, y):
         for x_m, y_m in pieces.cordinate_dict[piece[0]]:
-            if x_m + x < 0 or y_m + y < 0 or x_m + x >= 8 or y_m + y >= 8 or self.board[x_m + x + 8 * (y_m + y)] == 1:
+            if x_m + x < 0 or y_m + y < 0 or x_m + x >= 8 or y_m + y >= 8 or self._cell(self.board, x_m + x + 8 * (y_m + y)) == 1:
                 return 0
         return 1
-    
+
     def run_place_block(self, piece, x, y):
         place_result = self.run_add_piece(piece, x, y)
         if place_result != -1:
@@ -79,7 +98,7 @@ class game:
             return board_break
         else:
             return -1
-    
+
     def run_one_game_turn_no_reset(self, move):
         line_broke = 0
         if self.current_pieces[move[0]][0] == -1:
@@ -92,7 +111,7 @@ class game:
             line_broke = 1
             self.combo += 1
             self.combo_counter = 3
-            if numpy.any(self.board == 1):
+            if self.board != 0:
                 self.score += 300
             self.score += 5
             if self.combo == 1:
@@ -115,23 +134,22 @@ class game:
         return line_broke
 
     def break_board(self):
-        full_rows = [y for y in range(8) if all(self.board[x + 8 * y] != 0 for x in range(8))]
-        full_cols = [x for x in range(8) if all(self.board[x + 8 * y] != 0 for y in range(8))]
+        full_rows = [y for y in range(8) if (self.board & _ROW_MASKS[y]) == _ROW_MASKS[y]]
+        full_cols = [x for x in range(8) if (self.board & _COL_MASKS[x]) == _COL_MASKS[x]]
         for y in full_rows:
-            for x in range(8):
-                self.board[x + 8 * y] = 0
+            self.board &= ~_ROW_MASKS[y]
         for x in full_cols:
-            for y in range(8):
-                self.board[x + 8 * y] = 0
+            self.board &= ~_COL_MASKS[x]
+        self.board &= (1 << 64) - 1
         return len(full_rows) + len(full_cols)
-    
+
     def reset_board(self):
-        self.board = numpy.zeros(64, dtype=int)
+        self.board = 0
 
     def random_pieces(self):
         random_pieces = [pieces.all_pieces[randint(0, len(pieces.all_pieces) - 1)] for i in range(3)]
         return random_pieces
-    
+
     def get_pieces(self):
         return self.current_pieces
 
@@ -146,8 +164,8 @@ class game:
     def one_game_turn(self, move):
         line_broke = self.one_game_turn_no_reset(move)
         self.reset_pieces()
-        return (self.current_pieces, self.board, self.combo, self.combo_counter, self.score, line_broke)
-    
+        return (self.current_pieces, self.get_board(), self.combo, self.combo_counter, self.score, line_broke)
+
     def one_game_turn_no_reset(self, move):
         line_broke = 0
         if self.current_pieces[move[0]][0] == -1:
@@ -160,7 +178,7 @@ class game:
             line_broke = 1
             self.combo += 1
             self.combo_counter = 3
-            if numpy.any(self.board == 1):
+            if self.board != 0:
                 self.score += 300
             self.score += 5
             if self.combo == 1:
@@ -185,10 +203,10 @@ class game:
     def reset_pieces(self):
         if all(item[0] == -1 for item in self.current_pieces):
             self.current_pieces = self.random_pieces()
-    
+
     def get_state(self):
-        return (self.current_pieces, self.board, self.combo, self.combo_counter, self.score)
-    
+        return (self.current_pieces, self.get_board(), self.combo, self.combo_counter, self.score)
+
     def print_cur_state(self):
         self.print_board()
         for i in range(3):
@@ -201,22 +219,22 @@ class game:
         self.combo = 0
         self.combo_counter = 0
         self.current_pieces = self.random_pieces()
-        return (self.current_pieces, self.board, self.combo, self.combo_counter, self.score)
-    
+        return (self.current_pieces, self.get_board(), self.combo, self.combo_counter, self.score)
+
     def deepcopy(self):
         return game(self.board, self.score, self.current_pieces, self.combo, self.combo_counter)
-    
+
     def check_for_holes(self):
         for x_a in range(8):
             for y_a in range(8):
-                if self.board[x_a + 8*y_a] == 1:
+                if self._cell(self.board, x_a + 8 * y_a) == 1:
                     continue
                 counter = 0
                 for h in [-1, 0, 1]:
                     for v in [-1, 0, 1]:
                         if h == v or -h == v:
                             continue
-                        if x_a + h < 0 or y_a + v < 0 or x_a + h >= 8 or y_a + v >= 8 or self.board[x_a + h + 8*(y_a + v)] == 1:
+                        if x_a + h < 0 or y_a + v < 0 or x_a + h >= 8 or y_a + v >= 8 or self._cell(self.board, x_a + h + 8 * (y_a + v)) == 1:
                             counter += 1
                 if counter == 4:
                     return 1
