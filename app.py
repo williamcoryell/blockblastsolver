@@ -119,17 +119,17 @@ def evaluate_best_move():
             if best_g == g:
                 print("unsolveable")
     
-    best_board_state = best_g.board.reshape((8, 8))
+    best_board_state = best_g.get_board().reshape((8, 8))
     
     step_boards = []
     temp_g = game(board=flat_board)
     temp_g.current_pieces = copy.deepcopy(current_pieces)
-    step_boards.append(temp_g.board.reshape((8, 8)).copy())
+    step_boards.append(temp_g.get_board().reshape((8, 8)).copy())
     
     if hasattr(best_g, 'move_history'):
         for move in best_g.move_history:
             temp_g.run_one_game_turn_no_reset(move)
-            step_boards.append(temp_g.board.reshape((8, 8)).copy())
+            step_boards.append(temp_g.get_board().reshape((8, 8)).copy())
 
 running = True
 btn_rect = pygame.Rect(460, 50, 180, 50) 

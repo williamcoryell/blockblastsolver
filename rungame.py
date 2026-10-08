@@ -5,7 +5,7 @@ def run_dfs(new_game, board_tensor, info_tensor, game_list, visited_states, curr
         current_path = []
     pieces = new_game.get_pieces()
     valid_moves = []
-    board_hash = new_game.board.tobytes()
+    board_hash = new_game.get_board().tobytes()
     available_pieces = tuple([p[0] for p in pieces if p[0] != -1])
     state_key = (board_hash, available_pieces, new_game.score)
     if state_key in visited_states:
@@ -28,7 +28,7 @@ def run_dfs(new_game, board_tensor, info_tensor, game_list, visited_states, curr
     if not went:
         if not hasattr(new_game, 'move_history'):
             new_game.move_history = current_path
-        cur_board = torch.tensor(new_game.board, dtype=torch.float32).view(-1, 1, 8, 8)
+        cur_board = torch.tensor(new_game.get_board(), dtype=torch.float32).view(-1, 1, 8, 8)
         other_info = torch.tensor([new_game.combo, new_game.combo_counter],dtype=torch.float32).unsqueeze(0)
         game_list = [new_game] + game_list
         board_tensor = torch.cat((cur_board, board_tensor), 0)

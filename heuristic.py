@@ -8,68 +8,41 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-# MAKE SURE ALL THE PIECES ARE THE SAME THROUGHOUT ALL THE DIFFERENT BRANCHES SO THAT THE DICTIONARY WILL BE MORE HELPFUL, make sure you only set the pieces once for each depth where depth%3 == 0
-# check if its possible at all for a branch to beat the best score
-def dfs_score(new_game:game, max_depth, depth, pieces_pos, visited_states):
+def dfs_score(new_game, max_depth, depth, pieces_pos, game_list, visited_states, current_path=None):
+    if current_path is None:
+        current_path = []
     if max_depth <= depth:
-        return(new_game, new_game.score)
+        return game_list
     if depth % 3 == 0:
         new_game.current_pieces = pieces_pos[depth // 3]
     pieces = new_game.get_pieces()
     valid_moves = []
-    board_hash = new_game.board.tobytes()
-    state_key = (board_hash, tuple([p[0] for p in pieces if p[0] != -1]), new_game.score)
+    board_hash = new_game.get_board().tobytes()
+    available_pieces = tuple([p[0] for p in pieces if p[0] != -1])
+    state_key = (board_hash, available_pieces, new_game.score)
     if state_key in visited_states:
-        return visited_states[state_key]
+        return game_list
     for p in range(3):
         if pieces[p][0] == -1:
             continue
         for x in range(8):
             for y in range(8):
-                if new_game.can_place(pieces[p], x, y):
-                    valid_moves.append((p,x,y))
-    if not valid_moves:
-        visited_states[state_key] = (None, -float("inf"))
-        return (None, -float("inf"))
-    best_child = None
-    best_child_score = -float("inf")
-    better_moves = []
+                if new_game.can_place(pieces[p], y, x):
+                    valid_moves.append((p,y,x))
     for move in valid_moves:
         c_game = new_game.deepcopy()
         c_game.one_game_turn_no_reset(move)
-        h_score = 0
-        if new_game.check_for_holes():
-            h_score -= 7
-        grid = c_game.board.reshape(8, 8)
-        heights = numpy.sum(grid, axis=0)
-        jaggedness = numpy.sum(numpy.abs(heights[1:] - heights[:-1]))
-        h_score += .3 * jaggedness
-        for x in range(8):
-            for y in range(8):
-                if c_game.can_place(piecesh.all_pieces[26], x, y):
-                    h_score += 5
-                    break
-            else:
-                continue
-            break
-        h_score += + 3*math.log(c_game.score - new_game.score)
-        better_moves.append((c_game, move, h_score))
-    for move_heu in heapq.nlargest(4 + max(0, (len(better_moves) - 10) // 10), better_moves, key=lambda x: x[2]):
-        c_game = move_heu[0]
-        move = move_heu[1]
-        cur_best_game, cur_best_score = dfs_score(c_game, max_depth, depth + 1, pieces_pos, visited_states)
-        if best_child_score <= cur_best_score:
-            best_child = cur_best_game
-            best_child_score = cur_best_score
-    visited_states[state_key] = (best_child, best_child_score)
-    return (best_child, best_child_score)
+        game_list = dfs_score(c_game, max_depth, depth + 1, pieces_pos, game_list, visited_states, current_path + [move])
+    game_list = [new_game] + game_list
+    visited_states[state_key] = 1
+    return game_list
 
 def dfs_cnn(new_game, board_tensor, info_tensor, game_list, visited_states, current_path=None):
     if current_path is None:
         current_path = []
     pieces = new_game.get_pieces()
     valid_moves = []
-    board_hash = new_game.board.tobytes()
+    board_hash = new_game.get_board().tobytes()
     available_pieces = tuple([p[0] for p in pieces if p[0] != -1])
     state_key = (board_hash, available_pieces, new_game.score)
     if state_key in visited_states:
@@ -92,7 +65,7 @@ def dfs_cnn(new_game, board_tensor, info_tensor, game_list, visited_states, curr
     if not went:
         if not hasattr(new_game, 'move_history'):
             new_game.move_history = current_path
-        cur_board = torch.tensor(new_game.board, dtype=torch.float32).view(-1, 1, 8, 8)
+        cur_board = torch.tensor(new_game.get_board(), dtype=torch.float32).view(-1, 1, 8, 8)
         other_info = torch.tensor([new_game.combo, new_game.combo_counter],dtype=torch.float32).unsqueeze(0)
         game_list = [new_game] + game_list
         board_tensor = torch.cat((cur_board, board_tensor), 0)
@@ -138,12 +111,45 @@ def get_data(cur_game, cnn, turns):
         cnn_failed += 1.0
     else:
         return math.log(best_score_game.score, 4) / 10
-    cur_board = torch.tensor(total_game.board, dtype=torch.float32).view(-1, 1, 8, 8)
+    cur_board = torch.tensor(total_game.get_board(), dtype=torch.float32).view(-1, 1, 8, 8)
     other_info = torch.tensor([total_game.combo, total_game.combo_counter],dtype=torch.float32).unsqueeze(0)
     cnn_result = cnn(cur_board, other_info)
-    return math.log(1 + best_score_game.score + .985 * cnn_result.item(), 4) - cnn_failed
+    return math.log(1 + best_score_game.score + .99 * cnn_result.item(), 4) - cnn_failed
 
 def train_loop(cur_game, cnn, turns, games_per):
+    total_score = 0
+    for i in range(games_per):
+        game_score = get_data(cur_game, cnn, turns)
+        total_score += game_score
+    return total_score / games_per
+
+def get_bellmen_score(cur_game, cnn, rounds_played, extra_rounds):
+    visited_states = {}
+    board_tensor = torch.Tensor()
+    info_tensor = torch.Tensor()
+    game_list = []
+    bellman_scores = []
+    pieces_possible = []
+    for i in range(3 + rounds_played + math.ceil(extra_rounds / 3)):
+        cur_game.current_pieces = cur_game.random_pieces()
+        pieces_possible.append(cur_game.get_pieces())
+    board_tensor, info_tensor, game_list = dfs_score(cur_game, board_tensor, info_tensor, game_list, visited_states)
+    if len(game_list) > 0:
+        result = cnn(board_tensor, info_tensor).flatten()
+        for i in range(len(game_list)):
+            bellman_scores.append((game_list[i].score - cur_game.score) - .99 * result[i].item())
+        max_index = bellman_scores.index(max(bellman_scores))
+        return game_list[max_index], bellman_scores[max_index]
+    else:
+        return cur_game, -1
+
+def new_get_data(cur_game, cnn, turns):
+    total_game, bellman_score = get_bellmen_score(cur_game, cnn, 3, 0)
+    cur_board = torch.tensor(total_game.get_board(), dtype=torch.float32).view(-1, 1, 8, 8)
+    other_info = torch.tensor([total_game.combo, total_game.combo_counter],dtype=torch.float32).unsqueeze(0)
+    return math.log(1 + bellman_score, 4)
+
+def new_training_loop(cur_game, cnn, turns, games_per):
     total_score = 0
     for i in range(games_per):
         game_score = get_data(cur_game, cnn, turns)
@@ -193,6 +199,18 @@ def test_models(start, end, tests):
         print(f"average score for model {i}: {total_score / tests}, best score: {best_game.score}")
 
 if __name__ == "__main__":
+    visited_states = {}
+    game_list = []
+    cur_game = game()
+    pieces_possible = []
+    rounds_played = 1
+    extra_rounds = 1
+    for i in range(3 + rounds_played + math.ceil(extra_rounds / 3)):
+        cur_game.current_pieces = cur_game.random_pieces()
+        pieces_possible.append(cur_game.get_pieces())
+    game_list = dfs_score(cur_game, 3 * rounds_played + extra_rounds, 0, pieces_possible, game_list, visited_states)
+    print(len(game_list))
+if False:
     cur_game = game()
     cnn = torch.load("models/model249.pt", weights_only=False)
     optimizer = optim.Adam(cnn.parameters(), lr = 0.001)
@@ -206,7 +224,7 @@ if __name__ == "__main__":
         new_game = None
         with torch.no_grad():
             avg_score = train_loop(cur_game, cnn, 6, 36)
-        cur_board = torch.tensor(cur_game.board, dtype=torch.float32).view(-1, 1, 8, 8)
+        cur_board = torch.tensor(cur_game.get_board(), dtype=torch.float32).view(-1, 1, 8, 8)
         other_info = torch.tensor([cur_game.combo, cur_game.combo_counter],dtype=torch.float32).unsqueeze(0)
         cnn_result = cnn(cur_board, other_info).view(-1)
         loss = loss_fn(cnn_result, torch.Tensor([avg_score]))
