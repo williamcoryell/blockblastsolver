@@ -198,7 +198,7 @@ if __name__ == "__main__":
     optimizer = optim.Adam(cnn.parameters(), lr = 0.001)
     EPSILON_DECAY = 0.9999
     loss_fn = nn.SmoothL1Loss()
-    epsilon = 0.09
+    epsilon = 0.2
     i = 101
     while True:
         if cur_game == None:
@@ -230,5 +230,5 @@ if __name__ == "__main__":
                 print(f"saved model {i // 100}", end= " ")
                 test_models(i//100, (i // 100) + 1, 30)
         cur_game = new_game
-        epsilon = max(epsilon * EPSILON_DECAY, 0.09)
+        epsilon = max(epsilon * EPSILON_DECAY, 0.05)
         i += 1

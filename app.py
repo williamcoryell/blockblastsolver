@@ -10,7 +10,7 @@ from rungame import run_cnn
 from piecesh import pieces
 
 pygame.init()
-WIDTH, HEIGHT = 1280, 1000
+WIDTH, HEIGHT = (2880 // 2) - 10, (1800 // 2) - 10
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Block Blast AI Solver")
 font = pygame.font.SysFont("Arial", 20)
@@ -156,8 +156,8 @@ while running:
         draw_grid(screen, best_board_state, 50, 500, MAIN_CELL_SIZE, RED)
         
         for step_idx, step_b in enumerate(step_boards):
-            x_step = 550 + (step_idx % 2) * (8 * MINI_CELL_SIZE + 20)
-            y_step = 590 + (step_idx // 2) * (8 * MINI_CELL_SIZE + 30)
+            x_step = 900 + (step_idx % 2) * (8 * MINI_CELL_SIZE + 20)
+            y_step = 200 + (step_idx // 2) * (8 * MINI_CELL_SIZE + 30)
             draw_grid(screen, step_b, x_step, y_step, MINI_CELL_SIZE, DARK_GRAY)
 
     pygame.display.flip()
