@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from ai import Heuristic_CNN
+import time
 
 def dfs_score(new_game, board_tensor, info_tensor, max_depth, depth, pieces_pos, game_list, visited_states, beam_k=8):
     if depth % 3 == 0:
@@ -132,6 +133,8 @@ def get_board_score(cur_game, cnn, rounds_played, extra_turns, games_per):
     for i in range(games_per):
         game_score = get_bellmen_score(cur_game, cnn, rounds_played, extra_turns)
         total_score += game_score
+        # gpu broke in a move, this is all on my cpu, so im putting this here to prevent it from overheating
+        time.sleep(0.3)
     return total_score / games_per
 
 def choose_random_game(cur_game, depth = 2):
@@ -174,7 +177,7 @@ def test_models(start, end, tests):
         for j in range(tests):
             score, best_game = play_game(cnn, best_game)
             total_score += score
-        print(f"average score for model {i}: {total_score / tests}, best score: {best_game.score}")
+        print(f"average score for model {i}: {total_score / tests}, best score: {best_game.score}", flush=True)
 
 def training_loop(cur_game, cnn, rounds, turns, repetitions, epsilon, min_epsilon):
     optimizer = optim.Adam(cnn.parameters(), lr = 0.001)
@@ -208,9 +211,9 @@ def training_loop(cur_game, cnn, rounds, turns, repetitions, epsilon, min_epsilo
         if i % 10 == 0:
             if i % 100 == 0:
                 torch.save(cnn, f"models/model{i // 100}.pt")
-                print(f"\nsaved model {i // 100}", end= " ")
+                print(f"\nsaved model {i // 100}", end= " ", flush=True)
                 test_models(i//100, (i // 100) + 1, 30)
-            print("-", end="")
+            print("-", end="", flush=True)
         cur_game = new_game
         epsilon = max(epsilon * EPSILON_DECAY, min_epsilon)
         i += 1
