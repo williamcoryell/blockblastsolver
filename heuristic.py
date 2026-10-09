@@ -13,9 +13,8 @@ def dfs_score(new_game, board_tensor, info_tensor, max_depth, depth, pieces_pos,
     if depth % 3 == 0:
         new_game.current_pieces = pieces_pos[depth // 3]
     pieces = new_game.get_pieces()
-    board_hash = new_game.board
     available_pieces = tuple([p[0] for p in pieces if p[0] != -1])
-    state_key = (board_hash, available_pieces, new_game.combo, new_game.combo_counter)
+    state_key = (new_game.board, available_pieces, new_game.combo, new_game.combo_counter)
     if state_key in visited_states:
         return game_list, board_tensor, info_tensor
     valid_games = []
@@ -48,8 +47,8 @@ def dfs_score(new_game, board_tensor, info_tensor, max_depth, depth, pieces_pos,
                         h_score += + 3 * math.log(c_game.score - new_game.score)
                         valid_games.append((c_game, h_score))
         for moves in sorted(valid_games, key=lambda x: x[1], reverse=True)[:beam_k]:
-            game_list, board_tensor, info_tensor = dfs_score(moves[0], board_tensor, info_tensor, max_depth, depth + 1,
-                                    pieces_pos, game_list, visited_states)
+            game_list, board_tensor, info_tensor = dfs_score(moves[0], board_tensor, info_tensor, max_depth,
+                                                             depth + 1, pieces_pos, game_list, visited_states)
     game_list = [new_game] + game_list
     cur_board = torch.tensor(new_game.get_board(), dtype=torch.float32).view(-1, 1, 8, 8)
     other_info = torch.tensor([new_game.combo, new_game.combo_counter],dtype=torch.float32).unsqueeze(0)
@@ -63,7 +62,7 @@ def dfs_cnn(new_game, board_tensor, info_tensor, game_list, visited_states, curr
         current_path = []
     pieces = new_game.get_pieces()
     valid_moves = []
-    board_hash = new_game.board.tobytes()
+    board_hash = new_game.board
     available_pieces = tuple([p[0] for p in pieces if p[0] != -1])
     state_key = (board_hash, available_pieces, new_game.score)
     if state_key in visited_states:
@@ -128,7 +127,7 @@ def get_bellmen_score(cur_game, cnn, rounds_played, extra_turns):
     else:
         return -1
 
-def training_loop(cur_game, cnn, rounds_played, extra_turns, games_per):
+def get_board_score(cur_game, cnn, rounds_played, extra_turns, games_per):
     total_score = 0
     for i in range(games_per):
         game_score = get_bellmen_score(cur_game, cnn, rounds_played, extra_turns)
@@ -177,20 +176,17 @@ def test_models(start, end, tests):
             total_score += score
         print(f"average score for model {i}: {total_score / tests}, best score: {best_game.score}")
 
-if __name__ == "__main__":
-    cur_game = game()
-    cnn = Heuristic_CNN()
+def training_loop(cur_game, cnn, rounds, turns, repetitions, epsilon, min_epsilon):
     optimizer = optim.Adam(cnn.parameters(), lr = 0.001)
     EPSILON_DECAY = 0.9999
     loss_fn = nn.SmoothL1Loss()
-    epsilon = 0.2
-    i = 0
+    i = 1
     while True:
         if cur_game == None:
             cur_game = game()
         new_game = None
         with torch.no_grad():
-            avg_score = training_loop(cur_game, cnn, 2, 0, 30)
+            avg_score = get_board_score(cur_game, cnn, rounds, turns, repetitions)
         cur_board = torch.tensor(cur_game.get_board(), dtype=torch.float32).view(-1, 1, 8, 8)
         other_info = torch.tensor([cur_game.combo, cur_game.combo_counter],dtype=torch.float32).unsqueeze(0)
         cnn_result = cnn(cur_board, other_info).view(-1)
@@ -199,7 +195,7 @@ if __name__ == "__main__":
         loss.backward()
         optimizer.step()
         if epsilon > random.random():
-            for j in range(100):
+            for j in range(60):
                 new_game = choose_random_game(cur_game, 3)
                 if new_game != None:
                     break
@@ -212,8 +208,12 @@ if __name__ == "__main__":
         if i % 10 == 0:
             if i % 100 == 0:
                 torch.save(cnn, f"models/model{i // 100}.pt")
-                print(f"saved model {i // 100}", end= " ")
+                print(f"\nsaved model {i // 100}", end= " ")
                 test_models(i//100, (i // 100) + 1, 30)
+            print("-", end="")
         cur_game = new_game
-        epsilon = max(epsilon * EPSILON_DECAY, 0.05)
+        epsilon = max(epsilon * EPSILON_DECAY, min_epsilon)
         i += 1
+
+if __name__ == "__main__":
+    training_loop(game(), Heuristic_CNN(), 2, 1, 1, 0.2, 0.05)
